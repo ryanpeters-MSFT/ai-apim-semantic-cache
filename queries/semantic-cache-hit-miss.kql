@@ -1,0 +1,29 @@
+let apiPath = '/openai/deployments/chatdemo/chat/completions';
+let chatDependencyPath = '/openai/deployments/chatdemo/chat/completions';
+let embeddingsDependencyPath = '/openai/deployments/embeddingsdemo/embeddings';
+
+// classify each APIM request as a semantic cache hit or miss
+let dependencyFlags = AppDependencies
+| where TimeGenerated > ago(1d)
+| summarize
+    hasChatDependency = countif(Data has chatDependencyPath or Name has chatDependencyPath) > 0,
+    hasEmbeddingsDependency = countif(Data has embeddingsDependencyPath or Name has embeddingsDependencyPath) > 0,
+    dependencyCount = count()
+    by OperationId;
+
+AppRequests
+| where TimeGenerated > ago(1d)
+| where Url has apiPath
+| join kind=leftouter dependencyFlags on OperationId
+| extend cacheResult = iff(coalesce(hasChatDependency, false), 'miss', iff(coalesce(hasEmbeddingsDependency, false), 'hit', 'unknown'))
+| project TimeGenerated, Name, Url, DurationMs, ResultCode, Success, cacheResult, dependencyCount, OperationId
+| order by TimeGenerated desc
+
+// summarize hit and miss counts over time
+AppRequests
+| where TimeGenerated > ago(1d)
+| where Url has apiPath
+| join kind=leftouter dependencyFlags on OperationId
+| extend cacheResult = iff(coalesce(hasChatDependency, false), 'miss', iff(coalesce(hasEmbeddingsDependency, false), 'hit', 'unknown'))
+| summarize requests=count(), avgDurationMs=avg(DurationMs) by cacheResult, bin(TimeGenerated, 5m)
+| order by TimeGenerated desc

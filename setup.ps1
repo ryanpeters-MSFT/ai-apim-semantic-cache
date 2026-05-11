@@ -1,6 +1,6 @@
 param(
     [string]$suffix = 'demo01',
-    [string]$location = 'eastus2',
+    [string]$location = 'centralus',
     [string]$group = 'rg-apim-semantic-cache',
     [string]$publisherEmail = 'ryanpeters@microsoft.com',
     [string]$publisherName = 'Contoso',
@@ -10,7 +10,7 @@ param(
     [string]$embeddingsModelName = 'text-embedding-3-small',
     [string]$embeddingsModelVersion = '1',
     [string]$embeddingsDeployment = 'embeddingsdemo',
-    [string]$redisSku = 'Enterprise_E1',
+    [string]$redisSku = 'Balanced_B0',
     [int]$redisCapacity = 2,
     [string]$apimSku = 'Consumption'
 )
