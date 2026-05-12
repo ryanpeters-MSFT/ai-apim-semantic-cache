@@ -9,14 +9,14 @@ This repo contains a simple PowerShell deployment script that uses Azure CLI to 
 
 ## Files
 
-- `scripts/deploy-demo.ps1` deploys and wires the demo
+- `setup.ps1` deploys and wires the demo
 - `apim/openai-chat-api.json` is the minimal OpenAPI document imported into APIM
 - `apim/semantic-cache-policy.xml` is the APIM policy that enables semantic cache lookup and store
 
 ## Run
 
 ```powershell
-pwsh ./scripts/deploy-demo.ps1 -suffix demo01 -publisherEmail you@contoso.com -publisherName Contoso
+pwsh ./setup.ps1 -suffix demo01 -publisherEmail you@contoso.com -publisherName Contoso
 ```
 
 ## Notes
@@ -24,7 +24,7 @@ pwsh ./scripts/deploy-demo.ps1 -suffix demo01 -publisherEmail you@contoso.com -p
 - use a unique `-suffix` because the APIM and Foundry names must be unique
 - the default resource group is `rg-apim-semantic-cache`
 - the default location is `eastus2`
-- if the selected model versions are not available in your subscription or region, update `chatModelVersion` and `embeddingsModelVersion` in `scripts/deploy-demo.ps1`
+- if the selected model versions are not available in your subscription or region, update `chatModelVersion` and `embeddingsModelVersion` in `setup.ps1`
 - the script ignores create conflicts that only indicate a resource already exists so you can rerun it without adding pre-check scripts
 
 ## Test

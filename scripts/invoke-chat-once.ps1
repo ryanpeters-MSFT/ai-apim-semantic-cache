@@ -45,7 +45,6 @@ $response = Invoke-RestMethod -Method Post -Uri $context.endpoint -Headers @{
     'Content-Type' = 'application/json'
 } -Body $body
 
-Write-Host "endpoint: $($context.endpoint)"
-Write-Host "prompt: $prompt"
-Write-Host 'response:'
-Write-Host $response.choices[0].message.content
+#Write-Host "endpoint: $($context.endpoint)"
+#Write-Host "prompt: $prompt"
+Write-Host "response: $($response.choices[0].message.content)"
