@@ -192,7 +192,7 @@ $loggerBody = @{
 $loggerBodyPath = Join-Path $env:TEMP 'apim-logger.json'
 $loggerBody | Set-Content -Path $loggerBodyPath -NoNewline
 
-$message = (az rest --method put --uri "https://management.azure.com/subscriptions/$subscriptionId/resourceGroups/$group/providers/Microsoft.ApiManagement/service/$apim/loggers/$loggerId?api-version=2024-05-01" --body "@$loggerBodyPath" -o none 2>&1 | Out-String).Trim()
+$message = (az rest --method put --uri "https://management.azure.com/subscriptions/$subscriptionId/resourceGroups/$group/providers/Microsoft.ApiManagement/service/$apim/loggers/${loggerId}?api-version=2024-05-01" --body "@$loggerBodyPath" -o none 2>&1 | Out-String).Trim()
 if ($LASTEXITCODE -ne 0 -and $message -notmatch $conflictPattern) { throw $message }
 if ($LASTEXITCODE -ne 0) { Write-Host $message }
 
@@ -228,7 +228,7 @@ $diagnosticBody = @{
 $diagnosticBodyPath = Join-Path $env:TEMP 'apim-diagnostic.json'
 $diagnosticBody | Set-Content -Path $diagnosticBodyPath -NoNewline
 
-$message = (az rest --method put --uri "https://management.azure.com/subscriptions/$subscriptionId/resourceGroups/$group/providers/Microsoft.ApiManagement/service/$apim/apis/$apiId/diagnostics/$diagnosticId?api-version=2024-05-01" --body "@$diagnosticBodyPath" -o none 2>&1 | Out-String).Trim()
+$message = (az rest --method put --uri "https://management.azure.com/subscriptions/$subscriptionId/resourceGroups/$group/providers/Microsoft.ApiManagement/service/$apim/apis/$apiId/diagnostics/${diagnosticId}?api-version=2024-05-01" --body "@$diagnosticBodyPath" -o none 2>&1 | Out-String).Trim()
 if ($LASTEXITCODE -ne 0 -and $message -notmatch $conflictPattern) { throw $message }
 if ($LASTEXITCODE -ne 0) { Write-Host $message }
 

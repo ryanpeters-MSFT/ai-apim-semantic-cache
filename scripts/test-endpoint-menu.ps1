@@ -1,7 +1,6 @@
 param(
     [string]$location = 'centralus',
     [string]$group = 'rg-apim-semantic-cache',
-    [string]$subscriptionName = 'Built-in all-access subscription',
     [string]$chatDeployment = 'chatdemo',
     [string]$apiVersion = '2024-02-01',
     [string]$selection
@@ -20,24 +19,13 @@ function Get-ResolvedSuffix {
 }
 
 function Get-TestContext {
-    $subscriptionId = az account show --query id -o tsv
     $resolvedSuffix = Get-ResolvedSuffix
     $apim = ("apim{0}" -f $resolvedSuffix).ToLower()
-    $subscriptionListUri = "https://management.azure.com/subscriptions/$subscriptionId/resourceGroups/$group/providers/Microsoft.ApiManagement/service/$apim/subscriptions?api-version=2022-08-01"
-    $apimSubscriptionId = az rest --method get --uri $subscriptionListUri --query "value[?properties.displayName=='$subscriptionName'].name | [0]" -o tsv
-    if (-not $apimSubscriptionId) {
-        throw "APIM subscription '$subscriptionName' was not found on service '$apim'."
-    }
-
-    $subscriptionSecretUri = "https://management.azure.com/subscriptions/$subscriptionId/resourceGroups/$group/providers/Microsoft.ApiManagement/service/$apim/subscriptions/$apimSubscriptionId/listSecrets?api-version=2022-08-01"
-    $subscriptionKey = az rest --method post --uri $subscriptionSecretUri --query primaryKey -o tsv
     $endpoint = "https://$apim.azure-api.net/openai/deployments/$chatDeployment/chat/completions?api-version=$apiVersion"
 
     return @{
         apim = $apim
         endpoint = $endpoint
-        subscriptionId = $apimSubscriptionId
-        subscriptionKey = $subscriptionKey
     }
 }
 
@@ -59,12 +47,32 @@ function Invoke-TestRequest {
         max_tokens = 120
     } | ConvertTo-Json -Depth 10
 
+    $maxAttempts = 4
     $elapsed = Measure-Command {
-        $script:webResponse = Invoke-WebRequest -Method Post -Uri $context.endpoint -Headers @{
-            'Ocp-Apim-Subscription-Key' = $context.subscriptionKey
-            'Content-Type' = 'application/json'
-        } -Body $body
-        $script:response = $webResponse.Content | ConvertFrom-Json -Depth 20
+        for ($attempt = 1; $attempt -le $maxAttempts; $attempt++) {
+            try {
+                $script:webResponse = Invoke-WebRequest -Method Post -Uri $context.endpoint -Headers @{
+                    'Content-Type' = 'application/json'
+                } -Body $body
+                $script:response = $webResponse.Content | ConvertFrom-Json -Depth 20
+                break
+            }
+            catch {
+                $statusCode = $_.Exception.Response.StatusCode.value__
+                if ($statusCode -ne 429 -or $attempt -eq $maxAttempts) {
+                    throw
+                }
+
+                $retryAfterHeader = $_.Exception.Response.Headers['Retry-After']
+                $retryAfterSeconds = 15
+                if ($retryAfterHeader) {
+                    [void][int]::TryParse($retryAfterHeader[0], [ref]$retryAfterSeconds)
+                }
+
+                Write-Host "throttled on attempt $attempt. retrying in $retryAfterSeconds seconds..."
+                Start-Sleep -Seconds $retryAfterSeconds
+            }
+        }
     }
 
     $cacheStatus = $webResponse.Headers['x-semantic-cache']
@@ -83,7 +91,6 @@ function Show-Config {
     Write-Host "group: $group"
     Write-Host "apim: $($context.apim)"
     Write-Host "endpoint: $($context.endpoint)"
-    Write-Host "subscriptionId: $($context.subscriptionId)"
     Write-Host ''
 }
 
