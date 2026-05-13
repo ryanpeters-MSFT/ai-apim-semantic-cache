@@ -2,14 +2,15 @@ param(
     [string]$suffix,
     [string]$location = 'centralus',
     [string]$group = 'rg-apim-semantic-cache',
-    [string]$publisherEmail = 'ryanpeters@microsoft.com',
     [string]$publisherName = 'Contoso',
     [string]$chatModelName = 'gpt-4.1-mini',
     [string]$chatModelVersion = '2025-04-14',
     [string]$chatDeployment = 'chatdemo',
+    [int]$chatCapacity = 30,
     [string]$embeddingsModelName = 'text-embedding-3-small',
     [string]$embeddingsModelVersion = '1',
     [string]$embeddingsDeployment = 'embeddingsdemo',
+    [int]$embeddingsCapacity = 30,
     [string]$redisSku = 'Balanced_B0',
     [int]$redisCapacity = 2,
     [string]$apimSku = 'Developer'
@@ -31,6 +32,7 @@ $apim = "apim$resolvedSuffix"
 $redis = "redis$resolvedSuffix"
 $appInsights = "appi$resolvedSuffix"
 $apiId = 'openai-chat'
+$chatBackendId = 'openai-backend'
 $backendId = 'embeddings-backend'
 $loggerId = 'applicationinsights'
 $diagnosticId = 'applicationinsights'
@@ -49,6 +51,9 @@ az group create -n $group -l $location -o none
 # create the foundry openai resource
 az cognitiveservices account create -n $openAi -g $group --kind OpenAI --sku S0 -l $location --custom-domain $openAi --yes -o none
 
+# get publisher email for APIM
+$publisherEmail = az account show --query user.name -o tsv
+
 # create application insights for APIM diagnostics
 $appInsightsExists = ((az monitor app-insights component show -a $appInsights -g $group --query id -o tsv 2>$null | Out-String).Trim().Length -gt 0)
 if (-not $appInsightsExists) {
@@ -56,10 +61,10 @@ if (-not $appInsightsExists) {
 }
 
 # create the chat deployment
-az cognitiveservices account deployment create -g $group -n $openAi --deployment-name $chatDeployment --model-name $chatModelName --model-version $chatModelVersion --model-format OpenAI --sku-capacity 1 --sku-name GlobalStandard -o none
+az cognitiveservices account deployment create -g $group -n $openAi --deployment-name $chatDeployment --model-name $chatModelName --model-version $chatModelVersion --model-format OpenAI --sku-capacity $chatCapacity --sku-name GlobalStandard -o none
 
 # create the embeddings deployment
-az cognitiveservices account deployment create -g $group -n $openAi --deployment-name $embeddingsDeployment --model-name $embeddingsModelName --model-version $embeddingsModelVersion --model-format OpenAI --sku-capacity 1 --sku-name GlobalStandard -o none
+az cognitiveservices account deployment create -g $group -n $openAi --deployment-name $embeddingsDeployment --model-name $embeddingsModelName --model-version $embeddingsModelVersion --model-format OpenAI --sku-capacity $embeddingsCapacity --sku-name GlobalStandard -o none
 
 # create managed redis cluster
 $redisClusterBody = @{
@@ -129,11 +134,30 @@ $apimPrincipalId = az apim show -g $group -n $apim --query identity.principalId 
 # grant apim access to azure openai
 az role assignment create --assignee-object-id $apimPrincipalId --assignee-principal-type ServicePrincipal --role "Cognitive Services OpenAI User" --scope $openAiId -o none
 
+# add the chat backend
+$chatBackendBody = @{
+    properties = @{
+        description = 'chat backend for semantic cache demo'
+        url = "$openAiEndpoint/openai"
+        protocol = 'http'
+        credentials = @{
+            managedIdentity = @{
+                resource = 'https://cognitiveservices.azure.com'
+            }
+        }
+    }
+} | ConvertTo-Json -Depth 10
+
+$chatBackendBodyPath = Join-Path $env:TEMP 'apim-chat-backend.json'
+$chatBackendBody | Set-Content -Path $chatBackendBodyPath -NoNewline
+
+az rest --method put --uri "https://management.azure.com/subscriptions/$subscriptionId/resourceGroups/$group/providers/Microsoft.ApiManagement/service/$apim/backends/${chatBackendId}?api-version=2024-05-01" --body "@$chatBackendBodyPath" -o none
+
 # add the embeddings backend
 az apim backend create --service-name $apim -g $group --backend-id $backendId --protocol http --url "$openAiEndpoint/openai/deployments/$embeddingsDeployment/embeddings" --description "embeddings backend for semantic cache" -o none
 
 # import the chat api
-az apim api import --service-name $apim -g $group --api-id $apiId --path openai --display-name "OpenAI Chat Demo" --specification-format OpenApiJson --specification-path $specPath --service-url "$openAiEndpoint/openai" --subscription-required true -o none
+az apim api import --service-name $apim -g $group --api-id $apiId --path openai --display-name "OpenAI Chat Demo" --specification-format OpenApiJson --specification-path $specPath --service-url "$openAiEndpoint/openai" --subscription-required false -o none
 
 # configure application insights logger for APIM
 $loggerBody = @{
@@ -230,7 +254,7 @@ $policyResponsePath = Join-Path $env:TEMP "$apim-policy-response.txt"
 
 az rest --method put --uri "https://management.azure.com/subscriptions/$subscriptionId/resourceGroups/$group/providers/Microsoft.ApiManagement/service/$apim/apis/$apiId/policies/policy?api-version=2017-03-01" --body "@$policyBodyPath" --output-file $policyResponsePath -o none
 
-Remove-Item $loggerBodyPath,$diagnosticBodyPath,$cacheBodyPath,$policyBodyPath,$policyResponsePath -ErrorAction SilentlyContinue
+Remove-Item $chatBackendBodyPath,$loggerBodyPath,$diagnosticBodyPath,$cacheBodyPath,$policyBodyPath,$policyResponsePath -ErrorAction SilentlyContinue
 
 Write-Host "group: $group"
 Write-Host "apim: https://$apim.azure-api.net/openai/deployments/$chatDeployment/chat/completions?api-version=2024-02-01"

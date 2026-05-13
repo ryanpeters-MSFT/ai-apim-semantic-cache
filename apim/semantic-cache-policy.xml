@@ -1,14 +1,10 @@
 <policies>
     <inbound>
         <base />
-        <authentication-managed-identity resource="https://cognitiveservices.azure.com" output-token-variable-name="managedIdAccessToken" ignore-error="false" />
-        <set-header name="Authorization" exists-action="override">
-            <value>@("Bearer " + (string)context.Variables["managedIdAccessToken"])</value>
-        </set-header>
+        <set-backend-service backend-id="openai-backend" />
         <llm-semantic-cache-lookup score-threshold="0.05" embeddings-backend-id="embeddings-backend" embeddings-backend-auth="system-assigned" ignore-system-messages="true" max-message-count="10">
-            <vary-by>@(context.Subscription.Id)</vary-by>
+            <vary-by>shared</vary-by>
         </llm-semantic-cache-lookup>
-        <rate-limit calls="10" renewal-period="60" />
     </inbound>
     <backend>
         <base />
