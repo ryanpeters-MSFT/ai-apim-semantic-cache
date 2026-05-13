@@ -1,7 +1,5 @@
 param(
     [string]$suffix,
-    [string]$location = 'centralus',
-    [string]$group = 'rg-apim-semantic-cache',
     [string]$chatDeployment = 'chatdemo',
     [string]$apiVersion = '2024-02-01',
     [string]$prompt = 'Say hello in one short sentence.',
@@ -30,6 +28,4 @@ $response = Invoke-RestMethod -Method Post -Uri $endpoint -Headers @{
     'Content-Type' = 'application/json'
 } -Body $body
 
-#Write-Host "endpoint: $endpoint"
-#Write-Host "prompt: $prompt"
 Write-Host "response: $($response.choices[0].message.content)"
