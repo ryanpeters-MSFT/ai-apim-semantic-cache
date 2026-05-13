@@ -74,7 +74,7 @@ Call the APIM endpoint directly, or use the helper scripts in `scripts`.
 Single request:
 
 ```powershell
-.\scripts\invoke-chat-once.ps1 -suffix "bnrydad" -chatDeployment "chat"
+.\scripts\invoke-chat-once.ps1 -suffix bnrydad -chatDeployment chat -prompt "hi what is your name"                               
 ```
 
 Query recent cache results:
