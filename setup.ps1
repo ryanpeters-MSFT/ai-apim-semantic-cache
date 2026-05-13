@@ -1,5 +1,5 @@
 param(
-    [string]$suffix = 'demo01',
+    [string]$suffix,
     [string]$location = 'centralus',
     [string]$group = 'rg-apim-semantic-cache',
     [string]$publisherEmail = 'ryanpeters@microsoft.com',
@@ -12,32 +12,29 @@ param(
     [string]$embeddingsDeployment = 'embeddingsdemo',
     [string]$redisSku = 'Balanced_B0',
     [int]$redisCapacity = 2,
-    [string]$apimSku = 'Consumption'
+    [string]$apimSku = 'Developer'
 )
 
-$ErrorActionPreference = 'Stop'
-$root = $PSScriptRoot
-$specPath = Join-Path $root 'apim\openai-chat-api.json'
-$policyPath = Join-Path $root 'apim\semantic-cache-policy.xml'
+$specPath = 'apim\openai-chat-api.json'
+$policyPath = 'apim\semantic-cache-policy.xml'
+
 $subscriptionId = az account show --query id -o tsv
+
 $resolvedSuffix = $suffix
-if ($resolvedSuffix -eq 'demo01') {
-    $locationKey = ($location -replace '[^a-zA-Z]', '').ToLower()
-    if ($locationKey.Length -gt 3) {
-        $locationKey = $locationKey.Substring(0, 3)
-    }
-    $resolvedSuffix = "$locationKey$((($subscriptionId -replace '-', '').Substring(0, 6)).ToLower())"
+if ([string]::IsNullOrWhiteSpace($resolvedSuffix)) {
+    $characters = 'abcdefghijklmnopqrstuvwxyz'.ToCharArray()
+    $resolvedSuffix = -join (1..6 | ForEach-Object { $characters[(Get-Random -Maximum $characters.Length)] })
 }
 
-$openAi = ("foundry{0}" -f $resolvedSuffix).ToLower()
-$apim = ("apim{0}" -f $resolvedSuffix).ToLower()
-$redis = ("redis{0}" -f $resolvedSuffix).ToLower()
-$appInsights = ("appi{0}" -f $resolvedSuffix).ToLower()
+$openAi = "foundry$resolvedSuffix"
+$apim = "apim$resolvedSuffix"
+$redis = "redis$resolvedSuffix"
+$appInsights = "appi$resolvedSuffix"
 $apiId = 'openai-chat'
 $backendId = 'embeddings-backend'
 $loggerId = 'applicationinsights'
 $diagnosticId = 'applicationinsights'
-$conflictPattern = 'already exists|Conflict|already in use|cannot be updated because it already exists'
+
 $redisCapacityArg = @()
 if ($redisSku -like 'Enterprise_*' -or $redisSku -like 'EnterpriseFlash_*') {
     $redisCapacityArg = @('--capacity', $redisCapacity)
@@ -46,61 +43,23 @@ $redisApiVersion = '2025-08-01-preview'
 $redisClusterId = "/subscriptions/$subscriptionId/resourceGroups/$group/providers/Microsoft.Cache/redisEnterprise/$redis"
 $redisDatabaseId = "$redisClusterId/databases/default"
 
-function Invoke-AzCommand {
-    param(
-        [Parameter(Mandatory = $true)]
-        [string]$Command,
-        [string]$AllowedErrorPattern
-    )
-
-    $message = (& ([scriptblock]::Create($Command)) 2>&1 | Out-String).Trim()
-    if ($LASTEXITCODE -eq 0) {
-        return $message
-    }
-
-    if ($AllowedErrorPattern -and $message -match $AllowedErrorPattern) {
-        if ($message) {
-            Write-Host $message
-        }
-        return $message
-    }
-
-    throw $message
-}
-
-function Wait-RedisResourceState {
-    param(
-        [string]$resourceId,
-        [string]$targetState = 'Running'
-    )
-
-    for ($i = 0; $i -lt 120; $i++) {
-        $state = (az resource show --ids $resourceId --api-version $redisApiVersion --query properties.resourceState -o tsv 2>$null | Out-String).Trim()
-        if ($state -eq $targetState) { return }
-        if ($state -like '*Failed') { throw "Redis resource $resourceId entered state $state." }
-        Start-Sleep -Seconds 15
-    }
-
-    throw "Timed out waiting for Redis resource $resourceId to reach state $targetState."
-}
-
 # create the resource group
-Invoke-AzCommand -Command "az group create -n $group -l $location -o none" -AllowedErrorPattern $conflictPattern | Out-Null
+az group create -n $group -l $location -o none
 
 # create the foundry openai resource
-Invoke-AzCommand -Command "az cognitiveservices account create -n $openAi -g $group --kind OpenAI --sku S0 -l $location --custom-domain $openAi --yes -o none" -AllowedErrorPattern $conflictPattern | Out-Null
+az cognitiveservices account create -n $openAi -g $group --kind OpenAI --sku S0 -l $location --custom-domain $openAi --yes -o none
 
 # create application insights for APIM diagnostics
 $appInsightsExists = ((az monitor app-insights component show -a $appInsights -g $group --query id -o tsv 2>$null | Out-String).Trim().Length -gt 0)
 if (-not $appInsightsExists) {
-    Invoke-AzCommand -Command "az monitor app-insights component create -a $appInsights -g $group -l $location --kind web --application-type web --retention-time 30 -o none" -AllowedErrorPattern $conflictPattern | Out-Null
+    az monitor app-insights component create -a $appInsights -g $group -l $location --kind web --application-type web --retention-time 30 -o none
 }
 
 # create the chat deployment
-Invoke-AzCommand -Command "az cognitiveservices account deployment create -g $group -n $openAi --deployment-name $chatDeployment --model-name $chatModelName --model-version $chatModelVersion --model-format OpenAI --sku-capacity 1 --sku-name GlobalStandard -o none" -AllowedErrorPattern $conflictPattern | Out-Null
+az cognitiveservices account deployment create -g $group -n $openAi --deployment-name $chatDeployment --model-name $chatModelName --model-version $chatModelVersion --model-format OpenAI --sku-capacity 1 --sku-name GlobalStandard -o none
 
 # create the embeddings deployment
-Invoke-AzCommand -Command "az cognitiveservices account deployment create -g $group -n $openAi --deployment-name $embeddingsDeployment --model-name $embeddingsModelName --model-version $embeddingsModelVersion --model-format OpenAI --sku-capacity 1 --sku-name GlobalStandard -o none" -AllowedErrorPattern $conflictPattern | Out-Null
+az cognitiveservices account deployment create -g $group -n $openAi --deployment-name $embeddingsDeployment --model-name $embeddingsModelName --model-version $embeddingsModelVersion --model-format OpenAI --sku-capacity 1 --sku-name GlobalStandard -o none
 
 # create managed redis cluster
 $redisClusterBody = @{
@@ -121,10 +80,10 @@ $redisClusterBody | Set-Content -Path $redisClusterBodyPath -NoNewline
 
 $redisClusterExists = ((az resource show --ids $redisClusterId --api-version $redisApiVersion --query id -o tsv 2>$null | Out-String).Trim().Length -gt 0)
 if (-not $redisClusterExists) {
-    Invoke-AzCommand -Command "az rest --method put --uri 'https://management.azure.com/subscriptions/$subscriptionId/resourceGroups/$group/providers/Microsoft.Cache/redisEnterprise/${redis}?api-version=$redisApiVersion' --body '@$redisClusterBodyPath' -o none" -AllowedErrorPattern $conflictPattern | Out-Null
+    az rest --method put --uri "https://management.azure.com/subscriptions/$subscriptionId/resourceGroups/$group/providers/Microsoft.Cache/redisEnterprise/${redis}?api-version=$redisApiVersion" --body "@$redisClusterBodyPath" -o none
 }
 
-Wait-RedisResourceState -resourceId $redisClusterId
+az resource wait --ids $redisClusterId --api-version $redisApiVersion --custom "properties.resourceState=='Running'" --interval 15 --timeout 1800 --only-show-errors
 
 # create the default managed redis database with redisearch
 $redisDatabaseBody = @{
@@ -146,10 +105,10 @@ $redisDatabaseBody | Set-Content -Path $redisDatabaseBodyPath -NoNewline
 
 $redisDatabaseExists = ((az resource show --ids $redisDatabaseId --api-version $redisApiVersion --query id -o tsv 2>$null | Out-String).Trim().Length -gt 0)
 if (-not $redisDatabaseExists) {
-    Invoke-AzCommand -Command "az rest --method put --uri 'https://management.azure.com/subscriptions/$subscriptionId/resourceGroups/$group/providers/Microsoft.Cache/redisEnterprise/$redis/databases/default?api-version=$redisApiVersion' --body '@$redisDatabaseBodyPath' -o none" -AllowedErrorPattern $conflictPattern | Out-Null
+    az rest --method put --uri "https://management.azure.com/subscriptions/$subscriptionId/resourceGroups/$group/providers/Microsoft.Cache/redisEnterprise/$redis/databases/default?api-version=$redisApiVersion" --body "@$redisDatabaseBodyPath" -o none
 }
 
-Wait-RedisResourceState -resourceId $redisDatabaseId
+az resource wait --ids $redisDatabaseId --api-version $redisApiVersion --custom "properties.resourceState=='Running'" --interval 15 --timeout 1800 --only-show-errors
 
 Remove-Item $redisClusterBodyPath,$redisDatabaseBodyPath -ErrorAction SilentlyContinue
 
@@ -163,18 +122,18 @@ $appInsightsId = az monitor app-insights component show -a $appInsights -g $grou
 $appInsightsInstrumentationKey = az monitor app-insights component show -a $appInsights -g $group --query instrumentationKey -o tsv
 
 # create apim with managed identity
-Invoke-AzCommand -Command "az apim create -n $apim -g $group -l $location --sku-name $apimSku --publisher-email $publisherEmail --publisher-name $publisherName --enable-managed-identity true -o none" -AllowedErrorPattern $conflictPattern | Out-Null
+az apim create -n $apim -g $group -l $location --sku-name $apimSku --publisher-email $publisherEmail --publisher-name $publisherName --enable-managed-identity true -o none
 
 $apimPrincipalId = az apim show -g $group -n $apim --query identity.principalId -o tsv
 
 # grant apim access to azure openai
-Invoke-AzCommand -Command "az role assignment create --assignee-object-id $apimPrincipalId --assignee-principal-type ServicePrincipal --role 'Cognitive Services OpenAI User' --scope $openAiId -o none" -AllowedErrorPattern $conflictPattern | Out-Null
+az role assignment create --assignee-object-id $apimPrincipalId --assignee-principal-type ServicePrincipal --role "Cognitive Services OpenAI User" --scope $openAiId -o none
 
 # add the embeddings backend
-Invoke-AzCommand -Command "az apim backend create --service-name $apim -g $group --backend-id $backendId --protocol http --url '$openAiEndpoint/openai/deployments/$embeddingsDeployment/embeddings' --description 'embeddings backend for semantic cache' -o none" -AllowedErrorPattern $conflictPattern | Out-Null
+az apim backend create --service-name $apim -g $group --backend-id $backendId --protocol http --url "$openAiEndpoint/openai/deployments/$embeddingsDeployment/embeddings" --description "embeddings backend for semantic cache" -o none
 
 # import the chat api
-Invoke-AzCommand -Command "az apim api import --service-name $apim -g $group --api-id $apiId --path openai --display-name 'OpenAI Chat Demo' --specification-format OpenApiJson --specification-path '$specPath' --service-url '$openAiEndpoint/openai' --subscription-required true -o none" -AllowedErrorPattern $conflictPattern | Out-Null
+az apim api import --service-name $apim -g $group --api-id $apiId --path openai --display-name "OpenAI Chat Demo" --specification-format OpenApiJson --specification-path $specPath --service-url "$openAiEndpoint/openai" --subscription-required true -o none
 
 # configure application insights logger for APIM
 $loggerBody = @{
@@ -192,7 +151,7 @@ $loggerBody = @{
 $loggerBodyPath = Join-Path $env:TEMP 'apim-logger.json'
 $loggerBody | Set-Content -Path $loggerBodyPath -NoNewline
 
-Invoke-AzCommand -Command "az rest --method put --uri 'https://management.azure.com/subscriptions/$subscriptionId/resourceGroups/$group/providers/Microsoft.ApiManagement/service/$apim/loggers/${loggerId}?api-version=2024-05-01' --body '@$loggerBodyPath' -o none" -AllowedErrorPattern $conflictPattern | Out-Null
+az rest --method put --uri "https://management.azure.com/subscriptions/$subscriptionId/resourceGroups/$group/providers/Microsoft.ApiManagement/service/$apim/loggers/${loggerId}?api-version=2024-05-01" --body "@$loggerBodyPath" -o none
 
 # enable API diagnostics to send frontend and backend telemetry to application insights
 $diagnosticBody = @{
@@ -240,7 +199,7 @@ $diagnosticBody = @{
 $diagnosticBodyPath = Join-Path $env:TEMP 'apim-diagnostic.json'
 $diagnosticBody | Set-Content -Path $diagnosticBodyPath -NoNewline
 
-Invoke-AzCommand -Command "az rest --method put --uri 'https://management.azure.com/subscriptions/$subscriptionId/resourceGroups/$group/providers/Microsoft.ApiManagement/service/$apim/apis/$apiId/diagnostics/${diagnosticId}?api-version=2024-05-01' --body '@$diagnosticBodyPath' -o none" -AllowedErrorPattern $conflictPattern | Out-Null
+az rest --method put --uri "https://management.azure.com/subscriptions/$subscriptionId/resourceGroups/$group/providers/Microsoft.ApiManagement/service/$apim/apis/$apiId/diagnostics/${diagnosticId}?api-version=2024-05-01" --body "@$diagnosticBodyPath" -o none
 
 # configure apim to use redis as the external cache
 $cacheBody = @{
@@ -255,7 +214,7 @@ $cacheBody = @{
 $cacheBodyPath = Join-Path $env:TEMP "$apim-cache.json"
 $cacheBody | Set-Content -Path $cacheBodyPath -NoNewline
 
-Invoke-AzCommand -Command "az rest --method put --uri 'https://management.azure.com/subscriptions/$subscriptionId/resourceGroups/$group/providers/Microsoft.ApiManagement/service/$apim/caches/default?api-version=2022-08-01' --body '@$cacheBodyPath' -o none" -AllowedErrorPattern $conflictPattern | Out-Null
+az rest --method put --uri "https://management.azure.com/subscriptions/$subscriptionId/resourceGroups/$group/providers/Microsoft.ApiManagement/service/$apim/caches/default?api-version=2022-08-01" --body "@$cacheBodyPath" -o none
 
 # publish the semantic cache policy
 $policyContent = (Get-Content -Raw $policyPath).TrimStart([char]0xfeff)
@@ -269,7 +228,7 @@ $policyBodyPath = Join-Path $env:TEMP "$apim-policy.json"
 $policyBody | Set-Content -Path $policyBodyPath -NoNewline
 $policyResponsePath = Join-Path $env:TEMP "$apim-policy-response.txt"
 
-Invoke-AzCommand -Command "az rest --method put --uri 'https://management.azure.com/subscriptions/$subscriptionId/resourceGroups/$group/providers/Microsoft.ApiManagement/service/$apim/apis/$apiId/policies/policy?api-version=2017-03-01' --body '@$policyBodyPath' --output-file '$policyResponsePath' -o none" -AllowedErrorPattern $conflictPattern | Out-Null
+az rest --method put --uri "https://management.azure.com/subscriptions/$subscriptionId/resourceGroups/$group/providers/Microsoft.ApiManagement/service/$apim/apis/$apiId/policies/policy?api-version=2017-03-01" --body "@$policyBodyPath" --output-file $policyResponsePath -o none
 
 Remove-Item $loggerBodyPath,$diagnosticBodyPath,$cacheBodyPath,$policyBodyPath,$policyResponsePath -ErrorAction SilentlyContinue
 
