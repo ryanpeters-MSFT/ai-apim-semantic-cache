@@ -2,11 +2,11 @@
 
 This repo contains a simple PowerShell deployment script that uses Azure CLI to create:
 
-- an API Management instance
-- an Azure OpenAI in Foundry resource with one chat deployment and one embeddings deployment
-- a Redis Enterprise cluster with RediSearch enabled
-- an Application Insights resource for APIM diagnostics
-- an APIM API and policy that uses Redis as a semantic cache for chat completions
+- An API Management instance
+- An Azure OpenAI in Foundry resource with one chat deployment and one embeddings deployment
+- A Redis Enterprise cluster with RediSearch enabled
+- An Application Insights resource for APIM diagnostics
+- An APIM API and policy that uses Redis as a semantic cache for chat completions
 
 ## Run
 
@@ -16,6 +16,8 @@ This repo contains a simple PowerShell deployment script that uses Azure CLI to 
 
 If you omit `-suffix`, `setup.ps1` generates a random 6-character lowercase suffix and uses it for the Foundry, APIM, Redis, and Application Insights resource names.
 
+> Note: use the same `-suffix` value with `setup.ps1`, `invoke-chat-once.ps1`, and `query-cache-results.ps1`. If `setup.ps1` generates the suffix for you, reuse that exact value with the invoke and query scripts.
+
 Example with current defaults:
 
 ```powershell
@@ -24,16 +26,16 @@ Example with current defaults:
 
 ## Notes
 
-- the default location is `centralus`
-- the default resource group is `rg-apim-semantic-cache`
-- the default APIM SKU is `Developer`
-- the default `publisherName` is `Contoso`
+- The default location is `centralus`
+- The default resource group is `rg-apim-semantic-cache`
+- The default APIM SKU is `Developer`
+- The default `publisherName` is `Contoso`
 - `publisherEmail` is taken from the currently logged-in Azure account user
-- the chat and embeddings deployments default to `GlobalStandard` with capacity `30`
-- the API is imported with `subscription-required false`, so the APIM endpoint does not require a subscription key
-- the chat backend uses APIM system-assigned managed identity to call Azure OpenAI
-- the semantic cache policy uses the `openai-backend` and `embeddings-backend` APIM backends
-- if the selected model versions are not available in your subscription or region, update `chatModelVersion` and `embeddingsModelVersion` in `setup.ps1`
+- The chat and embeddings deployments default to `GlobalStandard` with capacity `30`
+- The API is imported with `subscription-required false`, so the APIM endpoint does not require a subscription key
+- The chat backend uses APIM system-assigned managed identity to call Azure OpenAI
+- The semantic cache policy uses the `openai-backend` and `embeddings-backend` APIM backends
+- If the selected model versions are not available in your subscription or region, update `chatModelVersion` and `embeddingsModelVersion` in `setup.ps1`
 
 ## How RediSearch Fits
 

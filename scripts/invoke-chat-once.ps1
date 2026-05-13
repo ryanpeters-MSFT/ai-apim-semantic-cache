@@ -9,7 +9,7 @@ param(
 $ErrorActionPreference = 'Stop'
 
 if ([string]::IsNullOrWhiteSpace($suffix)) {
-    throw 'suffix is required because setup.ps1 now uses an explicit or random suffix for resource names.'
+    throw 'suffix is required.'
 }
 
 $endpoint = "https://apim$suffix.azure-api.net/openai/deployments/$chatDeployment/chat/completions?api-version=$apiVersion"

@@ -261,3 +261,4 @@ Write-Host "apim: https://$apim.azure-api.net/openai/deployments/$chatDeployment
 Write-Host "openai: $openAiEndpoint"
 Write-Host "redis: $redisHost`:$redisPort"
 Write-Host "appInsights: $appInsights"
+Write-Host "suffix: $resolvedSuffix"

@@ -8,6 +8,10 @@ param(
     [string]$view = 'all'
 )
 
+if ([string]::IsNullOrWhiteSpace($suffix)) {
+    throw 'suffix is required.'
+}
+
 $appInsights = "appi$suffix"
 
 $resolvedTimeZone = [System.TimeZoneInfo]::FindSystemTimeZoneById($timeZone)
