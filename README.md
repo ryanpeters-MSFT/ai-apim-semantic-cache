@@ -84,4 +84,16 @@ Query recent cache results:
 .\scripts\query-cache-results.ps1 -group "rg-apim-semantic-cache" -chatDeployment "chatdemo" -appInsights "appibnrydad"
 ```
 
+Once invoked, the sample output will indicate the operation ID and whether the request was a cache Hit or Miss against the semantic cache policy.
+
+```powershell
+Time (EDT)          Id               Success Cache Request
+----------          --               ------- ----- -------
+2026-05-12 14:26:54 df984edd1893575d True    Miss  /openai/deployments/chatdemo/chat/completions?api-version=2024-02-01
+2026-05-12 14:27:05 c124700cbfbb8be8 True    Hit   /openai/deployments/chatdemo/chat/completions?api-version=2024-02-01
+2026-05-12 14:29:27 d636edffa825b38a True    Hit   /openai/deployments/chatdemo/chat/completions?api-version=2024-02-01
+2026-05-12 14:29:33 bd1aed014267bde4 True    Hit   /openai/deployments/chatdemo/chat/completions?api-version=2024-02-01
+2026-05-12 14:29:45 084584d989493234 True    Hit   /openai/deployments/chatdemo/chat/completions?api-version=2024-02-01
+```
+
 Repeat the same or similar prompts and inspect the `Cache` column in the query output to see semantic cache behavior.
