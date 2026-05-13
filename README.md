@@ -81,7 +81,7 @@ Single request:
 Query recent cache results:
 
 ```powershell
-.\scripts\query-cache-results.ps1 -group "rg-apim-semantic-cache" -chatDeployment "chatdemo" -appInsights "appibnrydad"
+.\scripts\query-cache-results.ps1 -group "rg-apim-semantic-cache" -suffix "bnrydad" -chatDeployment "chatdemo"
 ```
 
 Once invoked, the sample output will indicate the operation ID and whether the request was a cache Hit or Miss against the semantic cache policy.
