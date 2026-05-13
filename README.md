@@ -1,4 +1,4 @@
-# APIM Semantic Cache Demo
+# APIM with OpenAI and Semantic Cache
 
 This repo contains a simple PowerShell deployment script that uses Azure CLI to create:
 
@@ -11,7 +11,7 @@ This repo contains a simple PowerShell deployment script that uses Azure CLI to 
 ## Run
 
 ```powershell
-.\setup.ps1 -group "rg-apim-semantic-cache" -chatDeployment "chat" -embeddingsDeployment "embeddings" -suffix "bnrydad"
+.\setup.ps1 -group "rg-apim-semantic-cache" -chatDeployment "chatdemo" -embeddingsDeployment "embeddingsdemo" -suffix "bnrydad"
 ```
 
 If you omit `-suffix`, `setup.ps1` generates a random 6-character lowercase suffix and uses it for the Foundry, APIM, Redis, and Application Insights resource names.
@@ -27,6 +27,7 @@ Example with current defaults:
 - the default location is `centralus`
 - the default resource group is `rg-apim-semantic-cache`
 - the default APIM SKU is `Developer`
+- the default `publisherName` is `Contoso`
 - `publisherEmail` is taken from the currently logged-in Azure account user
 - the chat and embeddings deployments default to `GlobalStandard` with capacity `30`
 - the API is imported with `subscription-required false`, so the APIM endpoint does not require a subscription key
@@ -74,13 +75,13 @@ Call the APIM endpoint directly, or use the helper scripts in `scripts`.
 Single request:
 
 ```powershell
-.\scripts\invoke-chat-once.ps1 -suffix bnrydad -chatDeployment chat -prompt "hi what is your name"                               
+.\scripts\invoke-chat-once.ps1 -suffix "bnrydad" -chatDeployment "chatdemo" -prompt "hi what is your name"
 ```
 
 Query recent cache results:
 
 ```powershell
-.\scripts\query-cache-results.ps1 -group "rg-apim-semantic-cache" -chatDeployment "chat" -appInsights "appibnrydad"
+.\scripts\query-cache-results.ps1 -group "rg-apim-semantic-cache" -chatDeployment "chatdemo" -appInsights "appibnrydad"
 ```
 
 Repeat the same or similar prompts and inspect the `Cache` column in the query output to see semantic cache behavior.
