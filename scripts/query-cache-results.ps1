@@ -1,16 +1,16 @@
 param(
-    [string]$appInsights = 'appicen24ef16',
+    [string]$suffix,
     [string]$group = 'rg-apim-semantic-cache',
     [string]$chatDeployment = 'chatdemo',
     [string]$timespan = 'P1D',
+    [string]$timeZone = 'Eastern Standard Time',
     [ValidateSet('all', 'recent', 'summary')]
     [string]$view = 'all'
 )
 
-$ErrorActionPreference = 'Stop'
+$appInsights = "appi$suffix"
 
-$easternTimeZone = [System.TimeZoneInfo]::FindSystemTimeZoneById('Eastern Standard Time')
-$timeLabel = if ($easternTimeZone.IsDaylightSavingTime((Get-Date))) { 'EDT' } else { 'EST' }
+$resolvedTimeZone = [System.TimeZoneInfo]::FindSystemTimeZoneById($timeZone)
 
 function Invoke-AzCliJson {
     param(
@@ -98,7 +98,7 @@ if ($view -in @('all', 'recent')) {
             [System.Globalization.CultureInfo]::InvariantCulture,
             [System.Globalization.DateTimeStyles]::AssumeUniversal -bor [System.Globalization.DateTimeStyles]::AdjustToUniversal
         )
-        $localTime = [System.TimeZoneInfo]::ConvertTimeFromUtc($utcTime, $easternTimeZone)
+        $localTime = [System.TimeZoneInfo]::ConvertTimeFromUtc($utcTime, $resolvedTimeZone)
 
         [pscustomobject]@{
             SortTime = $utcTime
@@ -110,7 +110,7 @@ if ($view -in @('all', 'recent')) {
         }
     }
     $recentColumns = @(
-        @{ Name = "Time ($timeLabel)"; Expression = { $_.Time } },
+        @{ Name = "Time"; Expression = { $_.Time } },
         @{ Name = 'Id'; Expression = { $_.Id } },
         @{ Name = 'Success'; Expression = { $_.Success } },
         @{ Name = 'Cache'; Expression = { $_.Cache } },
