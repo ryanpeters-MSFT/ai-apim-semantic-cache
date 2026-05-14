@@ -1,8 +1,7 @@
 param(
     [string]$suffix,
-    [string]$group = 'rg-apim-semantic-cache',
     [string]$chatDeployment = 'chatdemo',
-    [string]$timespan = 'P1D',
+    [string]$group = 'rg-apim-semantic-cache',
     [string]$timeZone = 'Eastern Standard Time',
     [ValidateSet('all', 'recent', 'summary')]
     [string]$view = 'all'
@@ -12,6 +11,7 @@ if ([string]::IsNullOrWhiteSpace($suffix)) {
     throw 'suffix is required.'
 }
 
+$timespan = 'P1D'
 $appInsights = "appi$suffix"
 
 $resolvedTimeZone = [System.TimeZoneInfo]::FindSystemTimeZoneById($timeZone)

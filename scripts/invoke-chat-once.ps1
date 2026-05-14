@@ -1,17 +1,15 @@
 param(
     [string]$suffix,
     [string]$chatDeployment = 'chatdemo',
-    [string]$apiVersion = '2024-02-01',
-    [string]$prompt = 'Say hello in one short sentence.',
-    [int]$maxTokens = 60
+    [string]$prompt = 'Say hello in one short sentence.'
 )
-
-$ErrorActionPreference = 'Stop'
 
 if ([string]::IsNullOrWhiteSpace($suffix)) {
     throw 'suffix is required.'
 }
 
+$maxTokens = 60
+$apiVersion = '2024-02-01'
 $endpoint = "https://apim$suffix.azure-api.net/openai/deployments/$chatDeployment/chat/completions?api-version=$apiVersion"
 $body = @{
     messages = @(

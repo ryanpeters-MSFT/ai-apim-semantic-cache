@@ -1,21 +1,21 @@
 param(
     [string]$suffix,
-    [string]$location = 'centralus',
     [string]$group = 'rg-apim-semantic-cache',
     [string]$publisherName = 'Contoso',
     [string]$chatModelName = 'gpt-4.1-mini',
     [string]$chatModelVersion = '2025-04-14',
-    [string]$chatDeployment = 'chatdemo',
-    [int]$chatCapacity = 30,
-    [string]$embeddingsModelName = 'text-embedding-3-small',
-    [string]$embeddingsModelVersion = '1',
-    [string]$embeddingsDeployment = 'embeddingsdemo',
-    [int]$embeddingsCapacity = 30,
-    [string]$redisSku = 'Balanced_B0',
-    [int]$redisCapacity = 2,
-    [string]$apimSku = 'Developer'
+    [string]$chatDeployment = 'chatdemo'   
 )
 
+$chatCapacity = 30
+$embeddingsModelName = 'text-embedding-3-small'
+$embeddingsModelVersion = '1'
+$embeddingsDeployment = 'embeddingsdemo'
+$embeddingsCapacity = 30
+$redisSku = 'Balanced_B0'
+$redisCapacity = 2
+$apimSku = 'Developer'
+$location = 'centralus'
 $specPath = 'apim\openai-chat-api.json'
 $policyPath = 'apim\semantic-cache-policy.xml'
 
