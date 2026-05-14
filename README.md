@@ -71,13 +71,13 @@ Call the APIM endpoint directly, or use the helper scripts in `scripts`.
 Single request:
 
 ```powershell
-.\scripts\invoke-chat-once.ps1 -suffix "mysuffix" -chatDeployment "chatdemo" -prompt "hi what is your name"
+.\scripts\invoke-chat-once.ps1 -suffix "mysuffix" -prompt "hi what is your name"
 ```
 
 Query recent cache results:
 
 ```powershell
-.\scripts\query-cache-results.ps1 -group "rg-apim-semantic-cache" -suffix "mysuffix" -chatDeployment "chatdemo"
+.\scripts\query-cache-results.ps1 -suffix "mysuffix"
 ```
 
 Once invoked, the sample output will indicate the operation ID and whether the request was a cache Hit or Miss against the semantic cache policy. The output below uses a `score-threshold` of just 0.02 on the `llm-semantic-cache-lookup` policy, so small variances in the prompt can still trigger miss due to the low threshold. The sentence, "what is the earth's population?", while having the same intent as "what is population of the earth?", is not enough due to the low threshold. 
