@@ -11,18 +11,12 @@ This repo contains a simple PowerShell deployment script that uses Azure CLI to 
 ## Run
 
 ```powershell
-.\setup.ps1 -group "rg-apim-semantic-cache" -chatDeployment "chatdemo" -embeddingsDeployment "embeddingsdemo" -suffix "bnrydad"
+.\setup.ps1 -suffix "bnrydad"
 ```
 
 If you omit `-suffix`, `setup.ps1` generates a random 6-character lowercase suffix and uses it for the Foundry, APIM, Redis, and Application Insights resource names.
 
 > Note: use the same `-suffix` value with `setup.ps1`, `invoke-chat-once.ps1`, and `query-cache-results.ps1`. If `setup.ps1` generates the suffix for you, reuse that exact value with the invoke and query scripts.
-
-Example with current defaults:
-
-```powershell
-.\setup.ps1
-```
 
 ## Notes
 
@@ -70,7 +64,7 @@ For `llm-semantic-cache-store`, the docs only define the `duration` attribute, s
 
 The practical effect is that repeated or very similar prompts can be served from Redis instead of re-running the full chat completion each time. That reduces backend calls, lowers latency for similar requests, and gives you a visible cache hit/miss signal in the APIM telemetry queried by `query-cache-results.ps1`.
 
-## Test
+## Testing
 
 Call the APIM endpoint directly, or use the helper scripts in `scripts`.
 
@@ -86,16 +80,35 @@ Query recent cache results:
 .\scripts\query-cache-results.ps1 -group "rg-apim-semantic-cache" -suffix "bnrydad" -chatDeployment "chatdemo"
 ```
 
-Once invoked, the sample output will indicate the operation ID and whether the request was a cache Hit or Miss against the semantic cache policy.
+Once invoked, the sample output will indicate the operation ID and whether the request was a cache Hit or Miss against the semantic cache policy. The output below uses a `score-threshold` of just 0.02 on the `llm-semantic-cache-lookup` policy, so small variances in the prompt can still trigger miss due to the low threshold. The sentence, "what is the earth's population?", while having the same intent as "what is population of the earth?", is not enough due to the low threshold. 
 
 ```powershell
-Time (EDT)          Id               Success Cache Request
-----------          --               ------- ----- -------
-2026-05-12 14:26:54 df984edd1893575d True    Miss  /openai/deployments/chatdemo/chat/completions?api-version=2024-02-01
-2026-05-12 14:27:05 c124700cbfbb8be8 True    Hit   /openai/deployments/chatdemo/chat/completions?api-version=2024-02-01
-2026-05-12 14:29:27 d636edffa825b38a True    Hit   /openai/deployments/chatdemo/chat/completions?api-version=2024-02-01
-2026-05-12 14:29:33 bd1aed014267bde4 True    Hit   /openai/deployments/chatdemo/chat/completions?api-version=2024-02-01
-2026-05-12 14:29:45 084584d989493234 True    Hit   /openai/deployments/chatdemo/chat/completions?api-version=2024-02-01
+Time                Id               Success Cache RequestBody
+----                --               ------- ----- -----------
+2026-05-14 13:59:43 5cd94edefa1fe135 True    Miss  what is the earth's population?
+2026-05-14 13:59:48 6daf82e173b62e22 True    Hit   what is the earth's population?
+2026-05-14 13:59:51 beeaf52fb37b81db True    Hit   what is the earth's population?
+2026-05-14 13:59:52 2156e5a0ea349861 True    Hit   what is the earth's population?
+2026-05-14 14:00:07 ece16d1e5ab6cbeb True    Miss  what is population of the earth?
+2026-05-14 14:00:15 74c741dad5a113ac True    Hit   what is population of the earth?
+2026-05-14 14:00:18 cce40099984d7bf8 True    Hit   what is the earth's population?
+2026-05-14 14:00:23 5ec5c41a99210f16 True    Hit   what is the earths population?
+```
+
+However, changing the threshold to a higher value, such as 0.2, will allow for more variance in the prompt but still keep the same intent. The result is that different prompt formats and grammar will still trigger a Hit during the semantic cache lookup. In this example, multiple variances of the sentence indicate the same intent with the higher threshold.
+
+```powershell
+Time                Id               Success Cache RequestBody
+----                --               ------- ----- -----------
+2026-05-14 14:01:35 26897cb89ea2bfff True    Miss  what maryland's population?
+2026-05-14 14:01:39 e0e0a3ba8b8ee690 True    Hit   what maryland's population?
+2026-05-14 14:01:40 e23512387548c25b True    Hit   what maryland's population?
+2026-05-14 14:01:50 af0a36a92cbb9c86 True    Hit   what is the population of maryland?
+2026-05-14 14:01:52 086b33f7f30690e9 True    Hit   what is the population of maryland?
+2026-05-14 14:01:53 9f4dd856745662e9 True    Hit   what is the population of maryland?
+2026-05-14 14:01:54 16af05568d0569ea True    Hit   what is the population of maryland?
+2026-05-14 14:02:00 ad991e1a2c225336 True    Hit   what is population of maryland?
+2026-05-14 14:02:02 68a32141360ad455 True    Hit   what is population of maryland?
 ```
 
 Repeat the same or similar prompts and inspect the `Cache` column in the query output to see semantic cache behavior.

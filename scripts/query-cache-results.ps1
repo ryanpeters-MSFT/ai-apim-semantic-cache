@@ -52,6 +52,44 @@ function Invoke-AzCliText {
     ($output | Out-String).Trim()
 }
 
+function Get-LogProperties {
+    param(
+        [string]$PropertiesJson
+    )
+
+    if (-not $PropertiesJson) {
+        return $null
+    }
+
+    try {
+        return $PropertiesJson | ConvertFrom-Json
+    }
+    catch {
+        return $null
+    }
+}
+
+function Get-RequestContent {
+    param(
+        [string]$RequestBodyJson
+    )
+
+    if (-not $RequestBodyJson) {
+        return ''
+    }
+
+    try {
+        $requestBody = $RequestBodyJson | ConvertFrom-Json
+        if ($requestBody.messages -and $requestBody.messages.Count -gt 0) {
+            return $requestBody.messages[0].content
+        }
+    }
+    catch {
+    }
+
+    return ''
+}
+
 $workspaceResourceId = Invoke-AzCliText -Arguments @('monitor', 'app-insights', 'component', 'show', '-a', $appInsights, '-g', $group, '--query', 'workspaceResourceId', '-o', 'tsv')
 if (-not $workspaceResourceId) {
     throw "Workspace resource ID was not found for Application Insights '$appInsights'."
@@ -87,14 +125,11 @@ if ($view -in @('all', 'recent')) {
     $recentResults = Invoke-AzCliJson -Arguments @('monitor', 'log-analytics', 'query', '-w', $workspaceGuid, '--analytics-query', $recentQuery, '-t', $timespan, '-o', 'json')
     $recentRows = foreach ($row in $recentResults) {
         $cache = ''
-        if ($row.Properties) {
-            try {
-                $props = $row.Properties | ConvertFrom-Json
-                $cache = $props.Cache
-            }
-            catch {
-                $cache = ''
-            }
+        $requestContent = ''
+        $props = Get-LogProperties -PropertiesJson $row.Properties
+        if ($props) {
+            $cache = $props.Cache
+            $requestContent = Get-RequestContent -RequestBodyJson $props.'Request-Body'
         }
 
         $utcTime = [datetime]::Parse(
@@ -110,7 +145,7 @@ if ($view -in @('all', 'recent')) {
             Id = $row.Id
             Success = $row.Success
             Cache = $cache
-            Request = ([uri]$row.Url).PathAndQuery
+            RequestBody = $requestContent
         }
     }
     $recentColumns = @(
@@ -118,7 +153,7 @@ if ($view -in @('all', 'recent')) {
         @{ Name = 'Id'; Expression = { $_.Id } },
         @{ Name = 'Success'; Expression = { $_.Success } },
         @{ Name = 'Cache'; Expression = { $_.Cache } },
-        @{ Name = 'Request'; Expression = { $_.Request } }
+        @{ Name = 'RequestBody'; Expression = { $_.RequestBody } }
     )
     $recentRows |
         Sort-Object SortTime -Descending |
@@ -133,14 +168,9 @@ if ($view -in @('all', 'summary')) {
     $summaryResults = Invoke-AzCliJson -Arguments @('monitor', 'log-analytics', 'query', '-w', $workspaceGuid, '--analytics-query', $summaryQuery, '-t', $timespan, '-o', 'json')
     $summaryGroups = $summaryResults | ForEach-Object {
         $cache = ''
-        if ($_.Properties) {
-            try {
-                $props = $_.Properties | ConvertFrom-Json
-                $cache = $props.Cache
-            }
-            catch {
-                $cache = ''
-            }
+        $props = Get-LogProperties -PropertiesJson $_.Properties
+        if ($props) {
+            $cache = $props.Cache
         }
 
         [pscustomobject]@{
